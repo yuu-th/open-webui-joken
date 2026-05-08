@@ -519,7 +519,7 @@ async def get_user_chat_list_by_user_id(
     query: Optional[str] = None,
     order_by: Optional[str] = None,
     direction: Optional[str] = None,
-    user=Depends(get_admin_user),
+    user=Depends(get_verified_user),  # joken-team-share: allow USER role
     db: AsyncSession = Depends(get_async_session),
 ):
     if not ENABLE_ADMIN_CHAT_ACCESS:
@@ -829,7 +829,8 @@ async def get_shared_chat_by_id(
     if user.role == 'pending':
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.NOT_FOUND)
 
-    if user.role == 'admin' and ENABLE_ADMIN_CHAT_ACCESS:
+    # joken-team-share: allow any verified user to read others' chats by id (read-only)
+    if ENABLE_ADMIN_CHAT_ACCESS:
         chat = await Chats.get_chat_by_id(share_id, db=db)
     else:
         chat = await Chats.get_chat_by_share_id(share_id, db=db)
@@ -895,8 +896,8 @@ async def get_chat_by_id(id: str, user=Depends(get_verified_user), db: AsyncSess
     chat = await Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
 
     if not chat:
-        # Check if user has access via access grants (shared_chat grants)
-        if user.role == 'admin' and ENABLE_ADMIN_CHAT_ACCESS:
+        # joken-team-share: allow any verified user to read others' chats by id (read-only)
+        if ENABLE_ADMIN_CHAT_ACCESS:
             chat = await Chats.get_chat_by_id(id, db=db)
         else:
             has_grant = await AccessGrants.has_access(

@@ -63,7 +63,7 @@ async def get_users(
     order_by: Optional[str] = None,
     direction: Optional[str] = None,
     page: Optional[int] = 1,
-    user=Depends(get_admin_user),
+    user=Depends(get_verified_user),  # joken-team-share: allow USER role for team listing
     db: AsyncSession = Depends(get_async_session),
 ):
     limit = PAGE_ITEM_COUNT

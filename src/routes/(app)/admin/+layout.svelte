@@ -13,8 +13,12 @@
 	let loaded = false;
 
 	onMount(async () => {
-		if ($user?.role !== 'admin') {
-			await goto('/');
+		// joken-team-share: allow USER role to enter admin pages so they can view
+		// other team members' chat history via the existing UserChatsModal flow.
+		// Destructive admin actions remain backend-protected.
+		if (!$user) {
+			await goto('/auth');
+			return;
 		}
 		loaded = true;
 	});
