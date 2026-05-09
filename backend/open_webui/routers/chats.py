@@ -748,10 +748,14 @@ async def get_team_chat_list(
     # is fine. If this team grows, switch to a join query in the model layer.
     all_chats = await Chats.get_chats(skip=0, limit=10000, db=db)
 
-    # Build user_id -> UserModel lookup once
+    # Build user_id -> UserModel lookup once.
+    # Users.get_users() returns a dict {"users": [UserModel, ...], "total": int, ...}.
     users_resp = await Users.get_users(skip=0, limit=10000, db=db)
-    users_list = users_resp.users if hasattr(users_resp, 'users') else users_resp
-    users_by_id = {u.id: u for u in users_list}
+    if isinstance(users_resp, dict):
+        users_list = users_resp.get('users', [])
+    else:
+        users_list = getattr(users_resp, 'users', []) or []
+    users_by_id = {u.id: u for u in users_list if hasattr(u, 'id')}
 
     if include_self:
         filtered = list(all_chats)
