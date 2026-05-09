@@ -62,6 +62,12 @@ async def get_session() -> aiohttp.ClientSession:
             connector=connector,
             timeout=timeout,
             trust_env=True,
+            # joken-team-share: image-generation SSE chunks from OpenRouter
+            # (data:image/png;base64,...) routinely exceed aiohttp's default
+            # 64 KiB read buffer, surfacing as "Got more than 131072 bytes when
+            # reading: b'data: ...'". Bump the per-session read buffer so the
+            # upstream stream parser doesn't choke on a single large delta.
+            read_bufsize=16 * 1024 * 1024,
         )
         log.info(
             'Created shared aiohttp session pool (limit=%s, per_host=%s, dns_ttl=%d)',
