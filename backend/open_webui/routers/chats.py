@@ -27,6 +27,7 @@ from open_webui.models.shared_chats import SharedChats, SharedChatResponse
 from open_webui.models.access_grants import AccessGrants
 from open_webui.models.tags import TagModel, Tags
 from open_webui.models.folders import Folders
+from open_webui.models.users import Users
 from open_webui.internal.db import get_async_session
 
 from open_webui.config import ENABLE_ADMIN_CHAT_ACCESS, ENABLE_ADMIN_EXPORT
@@ -706,6 +707,75 @@ async def get_all_user_tags(user=Depends(get_verified_user), db: AsyncSession = 
     except Exception as e:
         log.exception(e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT())
+
+
+############################
+# GetTeamChats
+# joken-team-share: list every team member's chats with author attribution
+# so any verified user can browse them in the sidebar.
+############################
+
+
+class TeamChatTitleIdResponse(BaseModel):
+    id: str
+    title: str
+    updated_at: int
+    created_at: int
+    user_id: str
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    is_self: bool = False
+
+
+@router.get('/team', response_model=list[TeamChatTitleIdResponse])
+async def get_team_chat_list(
+    page: Optional[int] = 1,
+    include_self: Optional[bool] = False,
+    user=Depends(get_verified_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    if not ENABLE_ADMIN_CHAT_ACCESS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+
+    page = max(1, page or 1)
+    limit = 60
+    skip = (page - 1) * limit
+
+    # Pull all chats; the corpus is small (5-user team) so in-memory sort/filter
+    # is fine. If this team grows, switch to a join query in the model layer.
+    all_chats = await Chats.get_chats(skip=0, limit=10000, db=db)
+
+    # Build user_id -> UserModel lookup once
+    users_resp = await Users.get_users(skip=0, limit=10000, db=db)
+    users_list = users_resp.users if hasattr(users_resp, 'users') else users_resp
+    users_by_id = {u.id: u for u in users_list}
+
+    if include_self:
+        filtered = list(all_chats)
+    else:
+        filtered = [c for c in all_chats if c.user_id != user.id]
+
+    page_chats = filtered[skip:skip + limit]
+
+    out: list[TeamChatTitleIdResponse] = []
+    for c in page_chats:
+        u = users_by_id.get(c.user_id)
+        out.append(
+            TeamChatTitleIdResponse(
+                id=c.id,
+                title=(c.title or 'Untitled'),
+                updated_at=c.updated_at,
+                created_at=c.created_at,
+                user_id=c.user_id,
+                user_name=(u.name if u else None),
+                user_email=(u.email if u else None),
+                is_self=(c.user_id == user.id),
+            )
+        )
+    return out
 
 
 ############################

@@ -44,7 +44,8 @@
 		updateChatFolderIdById,
 		importChats,
 		deleteAllChats,
-		getChatListBySearchText
+		getChatListBySearchText,
+		getTeamChatList
 	} from '$lib/apis/chats';
 	import { createNewFolder, getFolders, updateFolderParentIdById } from '$lib/apis/folders';
 	import { createNewNote, getPinnedNoteList, toggleNotePinnedStatusById } from '$lib/apis/notes';
@@ -89,6 +90,13 @@
 	// Pagination variables
 	let chatListLoading = false;
 	let allChatsLoaded = false;
+
+	// joken-team-share: Team chats sidebar section
+	let teamChats: any[] = [];
+	let teamChatsExpanded = false;
+	let teamChatsLoading = false;
+	let teamChatsLoaded = false;
+	let teamChatsPage = 1;
 
 	let showCreateFolderModal = false;
 
@@ -282,12 +290,53 @@
 		}
 	};
 
+	// joken-team-share: load other team members' chats for the Team section
+	const initTeamChats = async () => {
+		teamChatsLoading = true;
+		teamChats = [];
+		teamChatsLoaded = false;
+		teamChatsPage = 1;
+		try {
+			const fetched = await getTeamChatList(localStorage.token, teamChatsPage, false);
+			teamChats = fetched ?? [];
+			teamChatsLoaded = (fetched ?? []).length < 60;
+		} catch (e) {
+			console.error('Team chat fetch failed:', e);
+			teamChats = [];
+		} finally {
+			teamChatsLoading = false;
+		}
+	};
+
+	const loadMoreTeamChats = async () => {
+		if (teamChatsLoading || teamChatsLoaded) return;
+		teamChatsLoading = true;
+		try {
+			teamChatsPage += 1;
+			const more = await getTeamChatList(localStorage.token, teamChatsPage, false);
+			teamChats = [...teamChats, ...(more ?? [])];
+			teamChatsLoaded = (more ?? []).length < 60;
+		} catch (e) {
+			console.error('Team chat pagination failed:', e);
+		} finally {
+			teamChatsLoading = false;
+		}
+	};
+
+	const formatAuthor = (chat: any) => {
+		const name = chat.user_name || (chat.user_email || '').split('@')[0] || 'unknown';
+		return `@${name}`;
+	};
+
 	const initChatList = async () => {
 		// Reset pagination variables
 		console.log('initChatList');
 		currentChatPage.set(1);
 		allChatsLoaded = false;
 		scrollPaginationEnabled.set(false);
+
+		// joken-team-share: refresh Team chats whenever own list refreshes
+		initTeamChats();
 
 		initFolders();
 		await Promise.all([
@@ -1583,6 +1632,93 @@
 								>
 									<Spinner className=" size-4" />
 									<div class=" ">{$i18n.t('Loading...')}</div>
+								</div>
+							{/if}
+						</div>
+
+						<!-- joken-team-share: チーム共有チャット一覧 (read-only) -->
+						<div class="pt-4 mt-2 border-t border-gray-200/50 dark:border-gray-800/50">
+							<button
+								type="button"
+								class="w-full flex items-center justify-between px-2.5 pb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition"
+								on:click={() => (teamChatsExpanded = !teamChatsExpanded)}
+								aria-expanded={teamChatsExpanded}
+							>
+								<span class="flex items-center gap-1.5">
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 20 20"
+										fill="currentColor"
+										class="size-4"
+									>
+										<path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+										<path
+											d="M6 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM1.49 15.326a.78.78 0 0 1-.358-.442 3 3 0 0 1 4.308-3.516 6.484 6.484 0 0 0-1.905 3.959c-.023.222-.014.442.025.654a4.97 4.97 0 0 1-2.07-.655ZM16.44 15.98a4.97 4.97 0 0 0 2.07-.654.78.78 0 0 0 .357-.442 3 3 0 0 0-4.308-3.517 6.484 6.484 0 0 1 1.907 3.96 2.32 2.32 0 0 1-.026.654ZM18 8a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM5.304 16.19a.844.844 0 0 1-.277-.71 5 5 0 0 1 9.947 0 .843.843 0 0 1-.277.71A6.975 6.975 0 0 1 10 18a6.974 6.974 0 0 1-4.696-1.81Z"
+										/>
+									</svg>
+									{$i18n.t('Team')}
+									{#if teamChats.length > 0}
+										<span class="ml-1 px-1.5 py-0.5 bg-gray-200 dark:bg-gray-800 rounded-full text-[10px]">
+											{teamChats.length}
+										</span>
+									{/if}
+								</span>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 20 20"
+									fill="currentColor"
+									class="size-3.5 transition-transform {teamChatsExpanded ? 'rotate-180' : ''}"
+								>
+									<path
+										fill-rule="evenodd"
+										d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+							</button>
+
+							{#if teamChatsExpanded}
+								<div transition:slide={{ duration: 150 }}>
+									{#if teamChatsLoading && teamChats.length === 0}
+										<div
+											class="w-full flex justify-center py-2 text-xs animate-pulse items-center gap-2"
+										>
+											<Spinner className=" size-4" />
+											<div>{$i18n.t('Loading...')}</div>
+										</div>
+									{:else if teamChats.length === 0}
+										<div class="px-2.5 py-2 text-xs text-gray-400 dark:text-gray-500">
+											{$i18n.t('No team chats yet')}
+										</div>
+									{:else}
+										{#each teamChats as tchat (`team-${tchat.id}`)}
+											<a
+												href={`/c/${tchat.id}`}
+												class="group flex items-center justify-between gap-1 px-2.5 py-1.5 mx-0 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 text-sm transition cursor-pointer"
+												title={tchat.title}
+											>
+												<div class="flex-1 min-w-0">
+													<div class="truncate text-gray-800 dark:text-gray-200">
+														{tchat.title || $i18n.t('Untitled')}
+													</div>
+													<div class="truncate text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+														{formatAuthor(tchat)}
+													</div>
+												</div>
+											</a>
+										{/each}
+
+										{#if !teamChatsLoaded}
+											<button
+												type="button"
+												class="w-full text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 py-1"
+												on:click={loadMoreTeamChats}
+												disabled={teamChatsLoading}
+											>
+												{teamChatsLoading ? $i18n.t('Loading...') : $i18n.t('Load more')}
+											</button>
+										{/if}
+									{/if}
 								</div>
 							{/if}
 						</div>

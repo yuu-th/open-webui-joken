@@ -114,6 +114,11 @@
 
 	let loading = true;
 
+	// joken-team-share: チームメイトの会話を開いているかのフラグ。
+	// True の時は入力欄を隠して "閲覧専用" バナーを出す。
+	let isReadOnly = false;
+	let readOnlyAuthorLabel = '';
+
 	const eventTarget = new EventTarget();
 	let controlPane: Pane | undefined;
 	let controlPaneComponent: ChatControls | undefined;
@@ -1322,6 +1327,15 @@
 			await goto('/');
 			return null;
 		});
+
+		// joken-team-share: チームメイトの会話なら read-only モードに切り替え
+		if (chat && $user && chat.user_id && chat.user_id !== $user.id) {
+			isReadOnly = true;
+			readOnlyAuthorLabel = chat.user?.name || (chat.user?.email || '').split('@')[0] || 'teammate';
+		} else {
+			isReadOnly = false;
+			readOnlyAuthorLabel = '';
+		}
 
 		if (chat) {
 			tags = await getTagsById(localStorage.token, $chatId).catch(async (error) => {
@@ -2939,6 +2953,47 @@
 							</div>
 
 							<div class=" pb-2 {dragged ? 'z-0' : 'z-10'}">
+								{#if isReadOnly}
+									<!-- joken-team-share: チームメイトの会話、read-only バナー -->
+									<div
+										class="mx-auto max-w-3xl px-3 pb-3"
+										role="status"
+										aria-live="polite"
+									>
+										<div
+											class="flex items-center gap-2 rounded-2xl border border-yellow-300/60 dark:border-yellow-700/40 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-900 dark:text-yellow-200 text-sm px-4 py-3"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												viewBox="0 0 20 20"
+												fill="currentColor"
+												class="size-4 flex-none"
+											>
+												<path
+													fill-rule="evenodd"
+													d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-12.25a.75.75 0 0 0-1.5 0v4.5a.75.75 0 0 0 .22.53l3 3a.75.75 0 1 0 1.06-1.06l-2.78-2.78V5.75Z"
+													clip-rule="evenodd"
+												/>
+											</svg>
+											<div class="flex-1">
+												<div class="font-medium">
+													{$i18n.t('Read-only — you are viewing @{{author}}\u0027s chat.', {
+														author: readOnlyAuthorLabel
+													})}
+												</div>
+												<div class="text-xs opacity-80 mt-0.5">
+													{$i18n.t('Reply is disabled. Start a new chat to continue this topic on your own.')}
+												</div>
+											</div>
+											<a
+												href="/"
+												class="ml-2 px-2.5 py-1 rounded-lg bg-white/80 dark:bg-black/30 hover:bg-white dark:hover:bg-black/50 text-xs font-medium transition"
+											>
+												{$i18n.t('New Chat')}
+											</a>
+										</div>
+									</div>
+								{:else}
 								<MessageInput
 									bind:this={messageInput}
 									{history}
@@ -3012,6 +3067,7 @@
 										}
 									}}
 								/>
+								{/if}
 
 								<div
 									class="absolute bottom-1 text-xs text-gray-500 text-center line-clamp-1 right-0 left-0"

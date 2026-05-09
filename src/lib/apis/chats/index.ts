@@ -96,6 +96,39 @@ export const importChats = async (token: string, chats: object[]) => {
 	return res;
 };
 
+// joken-team-share: fetch other team members' chats for the sidebar Team section
+export const getTeamChatList = async (
+	token: string = '',
+	page: number = 1,
+	include_self: boolean = false
+) => {
+	let error = null;
+	const params = new URLSearchParams();
+	params.append('page', `${page}`);
+	if (include_self) params.append('include_self', 'true');
+
+	const res = await fetch(`${WEBUI_API_BASE_URL}/chats/team?${params.toString()}`, {
+		method: 'GET',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...(token && { authorization: `Bearer ${token}` })
+		}
+	})
+		.then(async (r) => {
+			if (!r.ok) throw await r.json();
+			return r.json();
+		})
+		.catch((err) => {
+			error = err;
+			console.error(err);
+			return null;
+		});
+
+	if (error) throw error;
+	return res || [];
+};
+
 export const getChatList = async (
 	token: string = '',
 	page: number | null = null,
