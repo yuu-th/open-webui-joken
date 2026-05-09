@@ -1678,6 +1678,16 @@
 		}
 
 		if (choices) {
+			// joken-team-share: capture inline image outputs from image-generation
+			// models on OpenRouter (e.g. google/gemini-3-pro-image-preview,
+			// openai/gpt-5.4-image-2). Both stream and non-stream paths funnel
+			// through here, so we only need this single extraction.
+			const incomingImages = choices[0]?.message?.images ?? choices[0]?.delta?.images;
+			if (Array.isArray(incomingImages) && incomingImages.length > 0) {
+				const existing = Array.isArray(message.images) ? message.images : [];
+				message.images = [...existing, ...incomingImages];
+			}
+
 			if (choices[0]?.message?.content) {
 				// Non-stream response
 				message.content += choices[0]?.message?.content;

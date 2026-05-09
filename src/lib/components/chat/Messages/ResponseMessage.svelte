@@ -665,6 +665,27 @@
 							<StatusHistory statusHistory={message?.statusHistory} />
 						{/if}
 
+						<!-- joken-team-share: OpenRouter image-output models embed images
+						     in choices[0].message.images. Render them like attached files. -->
+						{#if message?.images && message.images.length > 0}
+							<div
+								class="my-1 w-full flex overflow-x-auto gap-2 flex-wrap"
+								dir={$settings?.chatDirection ?? 'auto'}
+							>
+								{#each message.images as img}
+									{@const src =
+										(typeof img === 'string'
+											? img
+											: img?.image_url?.url ?? img?.url ?? '') ?? ''}
+									{#if src}
+										<div>
+											<Image {src} alt={message.content || 'generated image'} />
+										</div>
+									{/if}
+								{/each}
+							</div>
+						{/if}
+
 						{#if message?.files && message.files?.filter((f) => f.type === 'image').length > 0}
 							<div
 								class="my-1 w-full flex overflow-x-auto gap-2 flex-wrap"
